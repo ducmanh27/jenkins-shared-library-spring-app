@@ -14,7 +14,8 @@ class GitHelper implements Serializable {
     }
 
     String getGitTag() {
-        return script.sh(script: "git describe --tags --exact-match || echo ''", returnStdout: true).trim()
+        def tag = script.sh(script: "git tag --points-at HEAD", returnStdout: true).trim()
+        return tag ?: ''
     }
 
     String getBranchName() {

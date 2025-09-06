@@ -2,7 +2,21 @@ import com.jenkins.helpers.GitHelper
 
 def call() {
     stage('Checkout') {
-        checkout scm
+        checkout([
+            $class: 'GitSCM',
+            branches: scm.branches,
+            doGenerateSubmoduleConfigurations: false,
+            extensions: [
+                [$class: 'CloneOption', 
+                 noTags: false,  // Quan trọng: cho phép fetch tags
+                 reference: '', 
+                 shallow: false
+                ]
+            ],
+            submoduleCfg: [],
+            userRemoteConfigs: scm.userRemoteConfigs
+        ])
+        
         script {
             def gitHelper = new GitHelper(this)
 

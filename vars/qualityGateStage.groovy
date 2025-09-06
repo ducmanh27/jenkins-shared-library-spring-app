@@ -1,11 +1,13 @@
 def call(String serviceDir, String sonarServer) {
     stage('Quality Gate') {
         dir(serviceDir) {
+            def sonarProjectKey = env.JOB_NAME.replaceAll(/[\/\%]/, '-') 
+            def sonarProjectName = env.JOB_NAME.replaceAll(/[\/\%]/, '-')
             withSonarQubeEnv(sonarServer) {
                 sh """
                     mvn sonar:sonar \
-                        -Dsonar.projectKey=${JOB_NAME} \
-                        -Dsonar.projectName="${JOB_NAME}" \
+                        -Dsonar.projectKey=${sonarProjectKey} \
+                        -Dsonar.projectName=${sonarProjectName} \
                         -Dsonar.projectVersion=1.0 \
                         -Dsonar.sources=src/main/java \
                         -Dsonar.tests=src/test/java \

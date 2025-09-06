@@ -1,13 +1,13 @@
 import com.jenkins.helpers.DockerHelper
 import com.jenkins.helpers.GitHelper
 
-def call(String serviceDir, String imageName) {
+def call(String serviceDir, String imageName, String imageTag) {
     script {
         def gitHelper = new GitHelper(this)
         def dockerHelper = new DockerHelper(this)
+        
+        imageTag = env.IMAGE_TAG ?: gitHelper.getImageTag()
 
-        // IMAGE_TAG đã được inject ở checkout stage
-        def imageTag = env.IMAGE_TAG ?: gitHelper.getImageTag()
         def branchName = gitHelper.getBranchName()
 
         // Luôn build image với version tag
