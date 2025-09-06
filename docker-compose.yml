@@ -3,8 +3,9 @@ version: '3.8'
 services:
   # Jenkins service with Docker-in-Docker capability
   jenkins:
-    # image: jenkins/jenkins:latest-jdk21
-    image: jenkins-dockercli
+    build:
+      context: .
+      dockerfile: Dockerfile.jenkins-with-docker-cli
     container_name: jenkins
     restart: unless-stopped
     privileged: true

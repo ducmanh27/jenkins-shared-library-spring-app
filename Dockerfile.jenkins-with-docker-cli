@@ -14,5 +14,3 @@ RUN apt-get update && \
     apt-get install -y docker-ce-cli
 
 USER jenkins
-
-# Build with command: docker build -t jenkins-dockercli -f Dockerfile.jenkins-with-docker-cli .
