@@ -29,22 +29,7 @@ pipeline {
             when { expression { isReleaseOrTag() } }
             steps {
                 script {
-                    def gitHelper = new com.jenkins.helpers.GitHelper(this)
-                    def dockerHelper = new com.jenkins.helpers.DockerHelper(this)
-
-                    def imageTag = env.IMAGE_TAG ?: gitHelper.getImageTag()
-                    def branchName = gitHelper.getBranchName()
-
-                    // Luôn build image với version tag
-                    dockerHelper.buildImage(env.SERVICE_DIR, env.IMAGE_NAME, imageTag)
-
-                    // Nếu là main, tag thêm latest
-                    if (branchName == 'main') {
-                        dockerHelper.tagImage(env.IMAGE_NAME, imageTag, 'latest')
-                    }
-
-                    env.DOCKER_IMAGE = "${env.IMAGE_NAME}:${imageTag}"
-                    echo "✅ Docker images built for ${branchName}: ${env.DOCKER_IMAGE}${branchName == 'main' ? ' + latest' : ''}"
+                    dockerBuildStage(env.SERVICE_DIR, env.IMAGE_NAME, env.IMAGE_TAG) 
                 }
             }
         }
