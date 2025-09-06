@@ -7,7 +7,7 @@
 A comprehensive Jenkins Shared Library that provides reusable pipeline stages for Java/Maven projects with integrated DevOps toolchain including SonarQube, Docker, security scanning, and notifications.
 
 ## 🚀 Features
-
+![CompleteCICDProject!](https://lucid.app/publicSegments/view/0c183bd6-73f4-4547-93e1-5246db5e863c/image.png) 
 - **Complete CI/CD Pipeline**: From checkout to deployment with quality gates
 - **Docker Integration**: Docker-in-Docker support for containerized builds
 - **Code Quality**: SonarQube integration with quality gates
