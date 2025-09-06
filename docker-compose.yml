@@ -1,0 +1,188 @@
+version: '3.8'
+
+services:
+  # Jenkins service with Docker-in-Docker capability
+  jenkins:
+    # image: jenkins/jenkins:latest-jdk21
+    image: jenkins-dockercli
+    container_name: jenkins
+    restart: unless-stopped
+    privileged: true
+    user: root
+    ports:
+      - "8080:8080"        # Jenkins UI
+      - "50000:50000"      # Jenkins agent communication
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - jenkins_docker_certs:/certs/client:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - DOCKER_HOST=tcp://docker:2376
+      - DOCKER_CERT_PATH=/certs/client
+      - DOCKER_TLS_VERIFY=1
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=true -Xmx2048m -Xms1024m
+    networks:
+      - jenkins_network
+    depends_on:
+      - docker-dind
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Docker-in-Docker service for secure Docker operations
+  docker-dind:
+    image: docker:24.0.5-dind
+    container_name: jenkins-docker
+    restart: unless-stopped
+    privileged: true
+    networks:
+      jenkins_network:
+        aliases:
+          - docker
+    ports:
+      - "2376:2376"
+    volumes:
+      - jenkins_docker_certs:/certs/client
+      - jenkins_home:/var/jenkins_home
+    environment:
+      - DOCKER_TLS_CERTDIR=/certs
+    command: --storage-driver=overlay2
+
+  # SonarQube service for code quality analysis
+  sonarqube:
+    image: sonarqube:10.1.0-community
+    container_name: sonarqube
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    environment:
+      - SONAR_JDBC_URL=jdbc:postgresql://sonarqube_db:5432/sonar
+      - SONAR_JDBC_USERNAME=sonar
+      - SONAR_JDBC_PASSWORD=${SONAR_DB_PASSWORD:-sonar123}
+      - SONAR_ES_BOOTSTRAP_CHECKS_DISABLE=true
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs
+    networks:
+      - jenkins_network
+    depends_on:
+      - sonarqube_db
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9000/api/system/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+  # PostgreSQL database for SonarQube
+  sonarqube_db:
+    image: postgres:15.3-alpine
+    container_name: sonarqube_db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=sonar
+      - POSTGRES_PASSWORD=${SONAR_DB_PASSWORD:-sonar123}
+      - POSTGRES_DB=sonar
+    volumes:
+      - sonarqube_db_data:/var/lib/postgresql/data
+    networks:
+      - jenkins_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sonar -d sonar"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Nexus Repository for artifact management
+  nexus:
+    image: sonatype/nexus3:3.39.0
+    container_name: nexus
+    restart: unless-stopped
+    ports:
+      - "8081:8081"        # Nexus UI
+      - "8082:8082"        # Docker registry port
+    volumes:
+      - nexus_data:/nexus-data
+    environment:
+      - INSTALL4J_ADD_VM_PARAMS=-Xms1024m -Xmx2048m -XX:MaxDirectMemorySize=2048m
+    networks:
+      - jenkins_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/service/rest/v1/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+
+  # Portainer for Docker management (optional)
+  portainer:
+    image: portainer/portainer-ce:2.18.3
+    container_name: portainer
+    restart: unless-stopped
+    ports:
+      - "9443:9443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    networks:
+      - jenkins_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "https://localhost:9443"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis for caching (optional, useful for large projects)
+  redis:
+    image: redis:7.0.12-alpine
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - jenkins_network
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis123}
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  jenkins_home:
+    driver: local
+  jenkins_docker_certs:
+    driver: local
+  sonarqube_data:
+    driver: local
+  sonarqube_extensions:
+    driver: local
+  sonarqube_logs:
+    driver: local
+  sonarqube_db_data:
+    driver: local
+  nexus_data:
+    driver: local
+  portainer_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  jenkins_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
