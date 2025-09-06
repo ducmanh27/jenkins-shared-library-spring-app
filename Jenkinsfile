@@ -11,7 +11,6 @@ pipeline {
     environment {
         SERVICE_DIR      = 'service/courses'
         IMAGE_NAME       = 'elearning/courses'
-        IMAGE_TAG        = "${BUILD_NUMBER}"
         SONARQUBE_SERVER = 'SonarQube'
     }
 
@@ -20,9 +19,40 @@ pipeline {
         stage('Build')         { steps { buildStage(env.SERVICE_DIR) } }
         stage('Test')          { steps { testStage(env.SERVICE_DIR) } }
         stage('Quality Gate')  { steps { qualityGateStage(env.SERVICE_DIR, env.SONARQUBE_SERVER) } }
-        stage('Package')       { steps { packageStage(env.SERVICE_DIR) } }
-        stage('Docker Build')  { steps { dockerBuildStage(env.SERVICE_DIR, env.IMAGE_NAME, env.IMAGE_TAG) } }
-        stage('Security Scan') { steps { securityScanStage(env.SERVICE_DIR, env.IMAGE_NAME, env.IMAGE_TAG) } }
+
+        stage('Package') {
+            when { expression { isReleaseOrTag() } }
+            steps { packageStage(env.SERVICE_DIR) }
+        }
+
+        stage('Docker Build') {
+            when { expression { isReleaseOrTag() } }
+            steps {
+                script {
+                    def gitHelper = new com.jenkins.helpers.GitHelper(this)
+                    def dockerHelper = new com.jenkins.helpers.DockerHelper(this)
+
+                    def imageTag = env.IMAGE_TAG ?: gitHelper.getImageTag()
+                    def branchName = gitHelper.getBranchName()
+
+                    // Luôn build image với version tag
+                    dockerHelper.buildImage(env.SERVICE_DIR, env.IMAGE_NAME, imageTag)
+
+                    // Nếu là main, tag thêm latest
+                    if (branchName == 'main') {
+                        dockerHelper.tagImage(env.IMAGE_NAME, imageTag, 'latest')
+                    }
+
+                    env.DOCKER_IMAGE = "${env.IMAGE_NAME}:${imageTag}"
+                    echo "✅ Docker images built for ${branchName}: ${env.DOCKER_IMAGE}${branchName == 'main' ? ' + latest' : ''}"
+                }
+            }
+        }
+
+        stage('Security Scan') {
+            when { expression { isReleaseOrTag() } }
+            steps { securityScanStage(env.SERVICE_DIR, env.IMAGE_NAME, env.IMAGE_TAG) } 
+        }
     }
 
     post {
