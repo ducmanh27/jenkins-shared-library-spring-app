@@ -11,6 +11,10 @@ def call() {
             // Lấy tag nếu commit có tag
             env.GIT_TAG = sh(script: "git describe --tags --exact-match || echo ''", returnStdout: true).trim()
 
+            // ⚡ Inject IMAGE_TAG cho các stage khác
+            // Nếu có git tag thì dùng tag, nếu không fallback BUILD_NUMBER
+            env.IMAGE_TAG = env.GIT_TAG ?: "${BUILD_NUMBER}"
+            
             echo "📋 Commit: ${env.GIT_COMMIT_SHORT}"
             echo "💬 Message: ${env.GIT_COMMIT_MSG}"
             echo "🌿 Branch: ${env.BRANCH_NAME}"
